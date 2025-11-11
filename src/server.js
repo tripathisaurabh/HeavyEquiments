@@ -27,7 +27,7 @@ app.use(
     origin: [
       "http://localhost:3000",     // local dev
       "http://192.168.0.227:3000", // LAN
-      "https://eqprent.vercel.app", // production frontend domain
+      "https://eqprent-frontend.vercel.app", // production frontend domain
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
