@@ -24,8 +24,11 @@ const prisma = new PrismaClient();
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-
+    origin: [
+      "http://localhost:3000",
+      "https://eqprent-frontend.vercel.app",
+      "https://eqprent-frontend-git-main-tripathisaurabh1411-5376s-projects.vercel.app",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
