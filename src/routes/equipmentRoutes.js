@@ -1,8 +1,9 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import { PrismaClient } from "@prisma/client";
+import { supabase } from "../utils/supabase.js";
+
 import {
   getEquipments,
   getEquipmentById,
@@ -12,39 +13,59 @@ import {
 } from "../controllers/equipmentController.js";
 
 const router = express.Router();
-const prisma = new PrismaClient(); // ✅ FIXED: Prisma client initialized here
+const prisma = new PrismaClient();
 
-// Ensure uploads directory exists
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// ✅ Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(
-      file.originalname
-    )}`;
-    cb(null, uniqueName);
-  },
-});
-
+/* =====================================================
+   Multer – Memory Storage (No Local Uploads)
+===================================================== */
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(), // store file in RAM buffer
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
     else cb(new Error("Only image files allowed"), false);
   },
 });
 
-// ✅ CRUD Routes
-// router.get("/:id", getEquipmentById);
-// router.post("/", upload.array("images", 5), createEquipment);
-// router.put("/:id", upload.array("images", 5), updateEquipment);
-// router.delete("/:id", deleteEquipment);
+/* =====================================================
+   Helper Function – Upload Images to Supabase
+===================================================== */
+async function uploadToSupabase(files) {
+  const bucket = process.env.SUPABASE_BUCKET;
+  const uploadedImages = [];
+
+  for (const file of files) {
+    const ext = path.extname(file.originalname);
+    const fileName = `equipment_${Date.now()}_${Math.random()}${ext}`;
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file.buffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.mimetype,
+      });
+
+    if (error) throw error;
+
+    // Get Public URL
+    const { data: publicUrl } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
+
+    uploadedImages.push({ url: publicUrl.publicUrl });
+  }
+
+  return uploadedImages;
+}
+
+/* =====================================================
+   Routes
+===================================================== */
+
+// GET All Equipments
 router.get("/", getEquipments);
+
+// SEARCH
 router.get("/search", async (req, res) => {
   const { q } = req.query;
 
@@ -68,7 +89,6 @@ router.get("/search", async (req, res) => {
       include: { vendor: true, images: true },
     });
 
-    // Related equipments (if none found)
     let related = [];
     if (results.length === 0) {
       related = await prisma.equipment.findMany({
@@ -83,8 +103,51 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
+
+// GET By ID
 router.get("/:id", getEquipmentById);
-router.post("/", upload.array("images", 5), createEquipment);
-router.put("/:id", upload.array("images", 5), updateEquipment);
+
+/* =====================================================
+   CREATE Equipment with Supabase Upload
+===================================================== */
+router.post("/", upload.array("images", 5), async (req, res) => {
+  try {
+    let uploadedImages = [];
+
+    if (req.files && req.files.length > 0) {
+      uploadedImages = await uploadToSupabase(req.files);
+    }
+
+    req.body.images = uploadedImages; // pass to controller
+    return createEquipment(req, res);
+  } catch (err) {
+    console.error("❌ Create Error:", err);
+    return res.status(500).json({ success: false, message: "Failed to create equipment" });
+  }
+});
+
+/* =====================================================
+   UPDATE Equipment with Supabase Upload
+===================================================== */
+router.put("/:id", upload.array("images", 5), async (req, res) => {
+  try {
+    let uploadedImages = [];
+
+    if (req.files && req.files.length > 0) {
+      uploadedImages = await uploadToSupabase(req.files);
+    }
+
+    req.body.images = uploadedImages;
+    return updateEquipment(req, res);
+  } catch (err) {
+    console.error("❌ Update Error:", err);
+    return res.status(500).json({ success: false, message: "Failed to update equipment" });
+  }
+});
+
+/* =====================================================
+   DELETE
+===================================================== */
 router.delete("/:id", deleteEquipment);
+
 export default router;
