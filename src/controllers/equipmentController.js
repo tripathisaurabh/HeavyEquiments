@@ -1,254 +1,190 @@
-// backend/src/controllers/equipmentController.js
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-// 🟢 Get all equipments
+/* =====================================================
+   GET ALL EQUIPMENTS
+===================================================== */
 export const getEquipments = async (req, res) => {
   try {
-    const { vendorId, from, to, equipment } = req.query;
-    const whereClause = vendorId ? { vendorId: parseInt(vendorId) } : {};
-
-    // Optional name filter
-    if (equipment) {
-      whereClause.name = { contains: equipment, mode: "insensitive" };
-    }
-
-    let excludeIds = [];
-
-    if (from && to) {
-      const fromDate = new Date(from);
-      const toDate = new Date(to);
-
-      // 1️⃣ Fetch overlapping bookings
-      const overlapping = await prisma.booking.findMany({
-        where: {
-          status: { not: "CANCELLED" },
-          AND: [
-            { pickupDate: { lte: toDate } },
-            { dropDate: { gte: fromDate } },
-          ],
-        },
-        select: {
-          equipmentId: true,
-          quantity: true, // 🔹 each booking’s quantity
-        },
-      });
-
-      // 2️⃣ Group by equipmentId and count booked quantities
-      const bookedMap = {};
-      for (const b of overlapping) {
-        if (!b.equipmentId) continue;
-        bookedMap[b.equipmentId] = (bookedMap[b.equipmentId] || 0) + (b.quantity || 1);
-      }
-
-      // 3️⃣ Fetch all equipments to compare total quantity
-      const allEquipments = await prisma.equipment.findMany({
-        where: whereClause,
-        select: { id: true, quantity: true },
-      });
-
-      // 4️⃣ Determine which are fully booked
-      excludeIds = allEquipments
-        .filter((eq) => {
-          const booked = bookedMap[eq.id] || 0;
-          return booked >= (eq.quantity || 1);
-        })
-        .map((eq) => eq.id);
-
-      console.log("⛔ Fully booked equipment IDs:", excludeIds);
-    }
-
-    // 5️⃣ Fetch only available equipments
     const equipments = await prisma.equipment.findMany({
-      where: {
-        ...whereClause,
-        ...(excludeIds.length > 0 && { id: { notIn: excludeIds } }),
-      },
-      include: {
-        vendor: { select: { id: true, name: true, companyName: true } },
-        images: true,
-      },
+      include: { images: true, vendor: true },
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
-    // 6️⃣ Format image URLs
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const formatted = equipments.map((eq) => ({
-      ...eq,
-      images: eq.images.map((img) =>
-        img.url.startsWith("http") ? img.url : `${baseUrl}${img.url}`
-      ),
-      imageUrl:
-        eq.images.length > 0
-          ? eq.images[0].url.startsWith("http")
-            ? eq.images[0].url
-            : `${baseUrl}${eq.images[0].url}`
-          : null,
-    }));
-
-    res.json({
-      items: formatted,
-      total: formatted.length,
-      page: 1,
-      limit: formatted.length,
-    });
-  } catch (error) {
-    console.error("❌ Error fetching equipments:", error);
-    res.status(500).json({ error: "Failed to fetch equipments" });
+    return res.json({ success: true, equipments });
+  } catch (err) {
+    console.error("❌ getEquipments error:", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch equipments" });
   }
 };
 
-
-
-
-// 🟢 Get single equipment by ID
-// import { PrismaClient } from "@prisma/client";
-// const prisma = new PrismaClient();
-
+/* =====================================================
+   GET SINGLE EQUIPMENT BY ID
+===================================================== */
 export const getEquipmentById = async (req, res) => {
   try {
-    // ✅ Extract id safely
-    const idParam = req.params.id;
+    const id = Number(req.params.id);
 
-    // ✅ Validate id
-    if (!idParam || isNaN(Number(idParam))) {
-      console.log("⚠️ Invalid ID received:", idParam);
-      return res.status(400).json({ error: "Invalid or missing equipment ID" });
-    }
-
-    const id = Number(idParam);
-
-    // ✅ Fetch from Prisma
     const equipment = await prisma.equipment.findUnique({
       where: { id },
       include: { images: true, vendor: true },
     });
 
     if (!equipment) {
-      console.log("⚠️ Equipment not found:", id);
-      return res.status(404).json({ error: "Equipment not found" });
+      return res.status(404).json({ success: false, message: "Equipment not found" });
     }
 
-    res.json(equipment);
+    return res.json({ success: true, equipment });
+
   } catch (err) {
-    console.error("❌ Error fetching equipment:", err);
-    res.status(500).json({ error: "Failed to fetch equipment" });
+    console.error("❌ getEquipmentById error:", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch equipment" });
   }
 };
 
-// 🟢 Create equipment
+/* =====================================================
+   CREATE EQUIPMENT
+===================================================== */
 export const createEquipment = async (req, res) => {
   try {
     const {
       name,
       type,
-      price,
       description,
+      price,
       vendorId,
+      brand,
+      model,
+      capacity,
+      year,
+      quantity,
       baseAddress,
+      landmark,
+      pincode,
       baseLat,
       baseLng,
       perKmRate,
-      quantity,   // ✅ added
     } = req.body;
 
-    if (!name || !type || !price || !vendorId) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+    const images = req.body.images || []; // Supabase URLs added by route
 
-    const newEquipment = await prisma.equipment.create({
+    const equipment = await prisma.equipment.create({
       data: {
         name,
         type,
+        description,
         price: parseFloat(price),
-        description: description || "",
-        vendorId: parseInt(vendorId),
-        baseAddress: baseAddress || null,
+        vendorId: Number(vendorId),
+        brand,
+        model,
+        capacity,
+        year: year ? Number(year) : null,
+        quantity: quantity ? Number(quantity) : 1,
+        baseAddress,
+        landmark,
+        pincode,
         baseLat: baseLat ? parseFloat(baseLat) : null,
         baseLng: baseLng ? parseFloat(baseLng) : null,
-        perKmRate: perKmRate ? parseFloat(perKmRate) : 150,
-        quantity: quantity ? parseInt(quantity) : 1, // ✅ fixed
+        perKmRate: perKmRate ? parseFloat(perKmRate) : null,
+
+        images: {
+          create: images.map((img) => ({ url: img.url })),
+        },
       },
+      include: { images: true },
     });
 
-    if (req.files && req.files.length > 0) {
-      const imageRecords = req.files.map((file) => ({
-        url: `/uploads/${file.filename}`,
-        equipmentId: newEquipment.id,
-      }));
-      await prisma.equipmentImage.createMany({ data: imageRecords });
-    }
+    return res.json({ success: true, equipment });
 
-    res.status(201).json({
-      message: "✅ Equipment added successfully",
-      equipment: newEquipment,
-    });
-  } catch (error) {
-    console.error("❌ Error creating equipment:", error);
-    res.status(500).json({ message: "Failed to create equipment" });
+  } catch (err) {
+    console.error("❌ createEquipment error:", err);
+    return res.status(500).json({ success: false, message: "Failed to create equipment" });
   }
 };
 
-
-// 🟢 Update equipment
+/* =====================================================
+   UPDATE EQUIPMENT
+===================================================== */
 export const updateEquipment = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+
     const {
       name,
       type,
-      price,
       description,
+      price,
+      brand,
+      model,
+      capacity,
+      year,
+      quantity,
       baseAddress,
+      landmark,
+      pincode,
       baseLat,
       baseLng,
       perKmRate,
-      quantity,   // ✅ added
     } = req.body;
 
+    // Supabase URLs
+    const newImages = req.body.images || [];
+
+    // Remove old images
+    await prisma.equipmentImage.deleteMany({
+      where: { equipmentId: id },
+    });
+
     const updated = await prisma.equipment.update({
-      where: { id: parseInt(id) },
+      where: { id },
       data: {
         name,
         type,
+        description,
         price: parseFloat(price),
-        description: description || "",
-        baseAddress: baseAddress || null,
+        brand,
+        model,
+        capacity,
+        year: year ? Number(year) : null,
+        quantity: quantity ? Number(quantity) : 1,
+        baseAddress,
+        landmark,
+        pincode,
         baseLat: baseLat ? parseFloat(baseLat) : null,
         baseLng: baseLng ? parseFloat(baseLng) : null,
-        perKmRate: perKmRate ? parseFloat(perKmRate) : 150,
-        quantity: quantity ? parseInt(quantity) : 1, // ✅ fixed
+        perKmRate: perKmRate ? parseFloat(perKmRate) : null,
+
+        images: {
+          create: newImages.map((img) => ({ url: img.url })),
+        },
       },
+      include: { images: true },
     });
 
-    if (req.files && req.files.length > 0) {
-      const imageRecords = req.files.map((file) => ({
-        url: `/uploads/${file.filename}`,
-        equipmentId: updated.id,
-      }));
-      await prisma.equipmentImage.createMany({ data: imageRecords });
-    }
+    return res.json({ success: true, updated });
 
-    res.json({ message: "✅ Equipment updated successfully", updated });
-  } catch (error) {
-    console.error("❌ Error updating equipment:", error);
-    res.status(500).json({ message: "Failed to update equipment" });
+  } catch (err) {
+    console.error("❌ updateEquipment error:", err);
+    return res.status(500).json({ success: false, message: "Failed to update equipment" });
   }
 };
 
-// 🟢 Delete equipment
+/* =====================================================
+   DELETE EQUIPMENT
+===================================================== */
 export const deleteEquipment = async (req, res) => {
   try {
-    const { id } = req.params;
-    await prisma.equipment.delete({ where: { id: parseInt(id) } });
-    res.json({ message: "✅ Equipment deleted successfully" });
-  } catch (error) {
-    console.error("❌ Error deleting equipment:", error);
-    res.status(500).json({ message: "Failed to delete equipment" });
+    const id = Number(req.params.id);
+
+    await prisma.equipment.delete({
+      where: { id },
+    });
+
+    return res.json({ success: true, message: "Equipment deleted" });
+
+  } catch (err) {
+    console.error("❌ deleteEquipment error:", err);
+    return res.status(500).json({ success: false, message: "Failed to delete equipment" });
   }
 };
-
-
-
-
-
