@@ -6,18 +6,20 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// ✅ Setup multer for image upload
+// Multer disk storage (for vendor profile images)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) =>
     cb(null, Date.now() + path.extname(file.originalname)),
 });
+
 const upload = multer({ storage });
 
-// ✅ Get Vendor Profile
+/** 🔍 Get Vendor Profile */
 router.get("/:vendorId", async (req, res) => {
   try {
     const vendorId = parseInt(req.params.vendorId);
+
     const vendor = await prisma.user.findUnique({
       where: { id: vendorId },
       select: {
@@ -32,6 +34,7 @@ router.get("/:vendorId", async (req, res) => {
     });
 
     if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+
     res.status(200).json(vendor);
   } catch (error) {
     console.error("Error fetching vendor profile:", error);
@@ -39,7 +42,7 @@ router.get("/:vendorId", async (req, res) => {
   }
 });
 
-// ✅ Update Vendor Profile (with image)
+/** ✏️ Update Vendor Profile */
 router.put("/:vendorId", upload.single("profileImg"), async (req, res) => {
   try {
     const vendorId = parseInt(req.params.vendorId);
