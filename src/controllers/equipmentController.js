@@ -47,6 +47,7 @@ export const getVendorEquipments = async (req, res) => {
   }
 };
 
+
 /* =====================================================
    GET SINGLE EQUIPMENT BY ID
 ===================================================== */
