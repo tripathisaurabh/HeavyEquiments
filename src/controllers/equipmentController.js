@@ -38,7 +38,7 @@ export const getVendorEquipments = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    return res.json({ success: true, equipments });
+return res.json({ success: true, items: equipments });
   } catch (err) {
     console.error("❌ getVendorEquipments:", err);
     return res
