@@ -16,8 +16,10 @@ import {
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Multer memory storage
 const upload = multer({ storage: multer.memoryStorage() });
 
+/* ------------------ Upload helper ------------------ */
 async function uploadToSupabase(files) {
   const bucket = process.env.SUPABASE_BUCKET;
   const uploaded = [];
@@ -43,12 +45,12 @@ async function uploadToSupabase(files) {
   return uploaded;
 }
 
-/* ====================== ROUTES ====================== */
+/* ------------------ ROUTES ------------------ */
 
-// Marketplace
+// Marketplace — All equipments
 router.get("/all", getAllEquipments);
 
-// Vendor Dashboard
+// Vendor dashboard — Only their own
 router.get("/", getVendorEquipments);
 
 // Single
@@ -59,10 +61,11 @@ router.post("/", upload.array("images", 5), async (req, res) => {
   try {
     req.body.images =
       req.files?.length ? await uploadToSupabase(req.files) : [];
+
     return createEquipment(req, res);
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ success: false });
+    console.error("❌ create error:", err);
+    return res.status(500).json({ success: false, message: "Failed" });
   }
 });
 
@@ -71,9 +74,10 @@ router.put("/:id", upload.array("images", 5), async (req, res) => {
   try {
     req.body.images =
       req.files?.length ? await uploadToSupabase(req.files) : [];
+
     return updateEquipment(req, res);
   } catch (err) {
-    console.error(err);
+    console.error("❌ update error:", err);
     return res.status(500).json({ success: false });
   }
 });
