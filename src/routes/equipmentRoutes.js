@@ -47,16 +47,16 @@ async function uploadToSupabase(files) {
 
 /* ------------------ ROUTES ------------------ */
 
-// Marketplace — All equipments
-router.get("/all", getAllEquipments);
+/** 🌍 PUBLIC — Marketplace Equipments (NO vendorId) */
+router.get("/", getAllEquipments);
 
-// Vendor dashboard — Only their own
-router.get("/", getVendorEquipments);
+/** 👤 VENDOR — Only their Equipments */
+router.get("/vendor", getVendorEquipments);
 
-// Single
+/** 🔍 SINGLE */
 router.get("/:id", getEquipmentById);
 
-// Create
+/** ➕ CREATE */
 router.post("/", upload.array("images", 5), async (req, res) => {
   try {
     req.body.images =
@@ -69,7 +69,7 @@ router.post("/", upload.array("images", 5), async (req, res) => {
   }
 });
 
-// Update
+/** ✏️ UPDATE */
 router.put("/:id", upload.array("images", 5), async (req, res) => {
   try {
     req.body.images =
@@ -81,14 +81,8 @@ router.put("/:id", upload.array("images", 5), async (req, res) => {
     return res.status(500).json({ success: false });
   }
 });
-router.options("/:id", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.status(200).end();
-});
 
-// Delete
+/** ❌ DELETE */
 router.delete("/:id", deleteEquipment);
 
 export default router;
