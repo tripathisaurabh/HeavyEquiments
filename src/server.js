@@ -29,7 +29,7 @@ app.use(
       "https://eqprent-frontend.vercel.app",
       "https://eqprent-frontend-git-main-tripathisaurabh1411-5376s-projects.vercel.app",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })
 );
