@@ -48,10 +48,12 @@ async function uploadToSupabase(files) {
 /* ------------------ ROUTES ------------------ */
 
 /** 🌍 PUBLIC — Marketplace Equipments (NO vendorId) */
-router.get("/", getAllEquipments);
+// Marketplace — All equipments (for /equipments page)
+router.get("/all", getAllEquipments);
 
-/** 👤 VENDOR — Only their Equipments */
-router.get("/vendor", getVendorEquipments);
+// Vendor dashboard — Only this vendor (via ?vendorId=)
+router.get("/", getVendorEquipments);
+
 
 /** 🔍 SINGLE */
 router.get("/:id", getEquipmentById);
