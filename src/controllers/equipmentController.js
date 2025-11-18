@@ -23,13 +23,17 @@ export const getAllEquipments = async (req, res) => {
 ===================================================== */
 export const getVendorEquipments = async (req, res) => {
   try {
-    const vendorId = Number(req.query.vendorId);
+    const vendorIdParam = req.query.vendorId;
+    console.log("🔍 getVendorEquipments vendorId:", vendorIdParam);
 
-    if (!vendorId)
-      return res.status(400).json({ success: false, message: "vendorId is required" });
+    // If vendorId is passed → filter by vendor
+    // If not passed (fallback) → return all (useful during debugging)
+    const where = vendorIdParam
+      ? { vendorId: Number(vendorIdParam) }
+      : {};
 
     const equipments = await prisma.equipment.findMany({
-      where: { vendorId },
+      where,
       include: { images: true },
       orderBy: { createdAt: "desc" },
     });
@@ -37,7 +41,9 @@ export const getVendorEquipments = async (req, res) => {
     return res.json({ success: true, equipments });
   } catch (err) {
     console.error("❌ getVendorEquipments:", err);
-    return res.status(500).json({ success: false, message: "Failed to fetch vendor equipments" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch vendor equipments" });
   }
 };
 
