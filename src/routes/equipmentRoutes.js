@@ -47,40 +47,43 @@ async function uploadToSupabase(files) {
 
 /* ------------------ ROUTES ------------------ */
 
-/** 🌍 PUBLIC — Marketplace Equipments (NO vendorId) */
-// Marketplace — All equipments (for /equipments page)
+/** 🌍 Marketplace – All equipments */
 router.get("/all", getAllEquipments);
 
-// Vendor dashboard — Only this vendor (via ?vendorId=)
-router.get("/", getVendorEquipments);
+/** 🧑‍🔧 Vendor dashboard – equipments of THIS vendor  
+ *  Route Example: /vendor/5  
+ *  Frontend must call: GET /api/equipments/vendor/${vendorId}
+ */
+router.get("/vendor/:vendorId", getVendorEquipments);
 
-
-/** 🔍 SINGLE */
+/** 🔍 Single Equipment */
 router.get("/:id", getEquipmentById);
 
 /** ➕ CREATE */
 router.post("/", upload.array("images", 5), async (req, res) => {
   try {
-    req.body.images =
-      req.files?.length ? await uploadToSupabase(req.files) : [];
+    req.body.images = req.files?.length
+      ? await uploadToSupabase(req.files)
+      : [];
 
     return createEquipment(req, res);
   } catch (err) {
     console.error("❌ create error:", err);
-    return res.status(500).json({ success: false, message: "Failed" });
+    return res.status(500).json({ success: false, message: "Failed to create" });
   }
 });
 
 /** ✏️ UPDATE */
 router.put("/:id", upload.array("images", 5), async (req, res) => {
   try {
-    req.body.images =
-      req.files?.length ? await uploadToSupabase(req.files) : [];
+    req.body.images = req.files?.length
+      ? await uploadToSupabase(req.files)
+      : [];
 
     return updateEquipment(req, res);
   } catch (err) {
     console.error("❌ update error:", err);
-    return res.status(500).json({ success: false });
+    return res.status(500).json({ success: false, message: "Failed to update" });
   }
 });
 
